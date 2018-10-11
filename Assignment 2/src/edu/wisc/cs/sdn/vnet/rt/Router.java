@@ -5,6 +5,7 @@ import edu.wisc.cs.sdn.vnet.DumpFile;
 import edu.wisc.cs.sdn.vnet.Iface;
 
 import net.floodlightcontroller.packet.Ethernet;
+import net.floodlightcontroller.packet.IPv4;
 
 /**
  * @author Aaron Gember-Jacobson and Anubhavnidhi Abhashkumar
@@ -85,7 +86,65 @@ public class Router extends Device
 		/********************************************************************/
 		/* TODO: Handle packets                                             */
 		
+		// packet is not IPv4, should drop the packet.
+		if (etherPacket.getEtherType() != Ethernet.TYPE_IPv4) {			 
+			System.out.println("----------------------------------");
+			System.out.println("The packet is not IPv4, drop the packet!");
+			System.out.println("----------------------------------");
+			return;
+		}
+		
+		// use getPayload() method of the Ethernet class to get the header, and cast the result to IPv4
+		IPv4 p = (IPv4) etherPacket.getPayload();
+		
+		// If the checksum is incorrect, drop the packet.
+		if (!verifyChecksum(p)) {			
+			System.out.println("----------------------------------");
+			System.out.println("The checksum is incorrect, drop the packet!");
+			System.out.println("----------------------------------");
+			return;
+		}
+
+		// decrement the IPv4 packet’s TTL by 1.
+		p.setTtl((byte)(p.getTtl() - 1));
+
+		// Drop the packet if TTL is less than 1
+		if ((int)p.getTtl() <= 0) {
+			System.out.println("----------------------------------");
+			System.out.println("TTL is 0, drop the packet!");
+			System.out.println("----------------------------------");
+			return;
+		}
+
 		
 		/********************************************************************/
+	}
+
+	/**
+	 * Check the correctness of a Ethernet packet.	 
+	 * @param packet the IPv4 packet that was received.
+	 * @return the correctness of a Ethernet packet. 
+	 */
+	private boolean verifyChecksum(IPv4 packet)
+	{
+		ByteBuffer bb = ByteBuffer.wrap(packet.serialize());
+		bb.rewind();
+		
+		// borrow the compute checkcum code from the serialize() method in the IPv4 class.
+		int accumulation = 0;
+		byte headerLength = packet.getHeaderLength();
+		for (int i = 0; i < headerLength * 2; ++i) {
+			int temp = 0xffff & bb.getShort();
+			// calculate the sum of each 16 bit value within the header, skipping only the checksum field itself.
+			if (i != 5) {
+				accumulation += temp;
+			}
+		}
+
+		accumulation = ((accumulation >> 16) & 0xffff)
+				+ (accumulation & 0xffff);
+		short checksum = (short) (~accumulation & 0xffff);
+		
+        return checksum == packet.getChecksum();
 	}
 }
