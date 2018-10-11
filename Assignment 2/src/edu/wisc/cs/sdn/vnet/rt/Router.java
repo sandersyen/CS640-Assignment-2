@@ -7,6 +7,8 @@ import edu.wisc.cs.sdn.vnet.Iface;
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.IPv4;
 
+import java.nio.ByteBuffer;
+import java.util.Map;
 /**
  * @author Aaron Gember-Jacobson and Anubhavnidhi Abhashkumar
  */
@@ -115,7 +117,61 @@ public class Router extends Device
 			System.out.println("----------------------------------");
 			return;
 		}
+		
+		// If the packet’s destination IP address exactly matches one of the interface’s IP addresses, drop the packet.
+		Map<String,Iface> tempInterfaces = this.getInterfaces();
+		for (String key : tempInterfaces.keySet())
+		{
+			if (tempInterfaces.get(key).getIpAddress() == p.getDestinationAddress())
+			{
+				System.out.println("----------------------------------");
+				System.out.println("the packet’s destination IP address matches, drop the packet!");
+				System.out.println("----------------------------------");
+				return;
+			}
+		}
 
+		// If no RouteEntry matches, your router should drop the packet.
+		RouteEntry desiredRouteEntry = this.routeTable.lookup(p.getDestinationAddress());
+		if (desiredRouteEntry == null)
+		{
+			System.out.println("----------------------------------");
+			System.out.println("No RouteEntry matches, drop the packet!");
+			System.out.println("----------------------------------");
+			return;
+		}
+
+		// If no ArpEntry matches, your router should drop the packet.
+		ArpEntry desiredArpEntry = this.arpCache.lookup(p.getDestinationAddress());
+		if (desiredArpEntry == null)
+		{
+			System.out.println("----------------------------------");
+			System.out.println("No ArpEntry matches for destination ip, drop the packet!");
+			System.out.println("----------------------------------");
+			return;
+		}
+
+		// Need to find the Mac address of the outgoing interface.
+		ArpEntry outgoingArpEntry = this.arpCache.lookup(desiredArpEntry.getIp());
+		if (outgoingArpEntry == null)
+		{
+			System.out.println("----------------------------------");
+			System.out.println("No ArpEntry matches for outgoing interface, drop the packet!");
+			System.out.println("----------------------------------");
+			return;
+		}
+
+		System.out.println("Setting source mac address to: " + outgoingArpEntry.getMac().toString());
+		etherPacket.setSourceMACAddress(outgoingArpEntry.getMac().toString());
+		System.out.println("Setting destination mac address to: " + desiredArpEntry.getMac().toString());
+		etherPacket.setDestinationMACAddress(desiredArpEntry.getMac().toString());
+		
+		// Update checksum. Call the serialize() function, since it will recompute the checksum onec the checksum is 0.
+		p.resetChecksum();
+		p.serialize();
+
+		System.out.println("Send the frame out the correct interface: " + desiredRouteEntry.getInterface());
+		sendPacket(etherPacket, desiredRouteEntry.getInterface());
 		
 		/********************************************************************/
 	}
