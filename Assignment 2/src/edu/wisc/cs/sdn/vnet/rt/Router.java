@@ -107,7 +107,7 @@ public class Router extends Device
 			return;
 		}
 
-		// decrement the IPv4 packet’s TTL by 1.
+		// decrement the IPv4 packet TTL by 1.
 		p.setTtl((byte)(p.getTtl() - 1));
 
 		// Drop the packet if TTL is less than 1
@@ -118,14 +118,14 @@ public class Router extends Device
 			return;
 		}
 		
-		// If the packet’s destination IP address exactly matches one of the interface’s IP addresses, drop the packet.
+		// If the packet destination IP address exactly matches one of the interface’s IP addresses, drop the packet.
 		Map<String,Iface> tempInterfaces = this.getInterfaces();
 		for (String key : tempInterfaces.keySet())
 		{
 			if (tempInterfaces.get(key).getIpAddress() == p.getDestinationAddress())
 			{
 				System.out.println("----------------------------------");
-				System.out.println("the packet’s destination IP address matches, drop the packet!");
+				System.out.println("the packet destination IP address matches, drop the packet!");
 				System.out.println("----------------------------------");
 				return;
 			}
