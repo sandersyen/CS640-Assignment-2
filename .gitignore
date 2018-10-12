@@ -1,7 +1,4 @@
-
-.DS_Store
-Assignment 2.pdf
-.DS_Store
+*.DS_Store
 .DS_Store
 Assignment 2/.DS_Store
 Assignment 2/src/.DS_Store
@@ -9,3 +6,4 @@ Assignment 2/src/edu/.DS_Store
 Assignment 2/src/edu/wisc/.DS_Store
 Assignment 2/src/edu/wisc/cs/.DS_Store
 Assignment 2/src/edu/wisc/cs/sdn/.DS_Store
+Assignment 2/src/edu/wisc/cs/sdn/vnet/.DS_Store

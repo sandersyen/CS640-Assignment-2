@@ -151,8 +151,9 @@ public class Router extends Device
 			return;
 		}
 
+		int interfaceIp = (desiredRouteEntry.getGatewayAddress() != 0) ? desiredRouteEntry.getGatewayAddress() : desiredRouteEntry.getDestinationAddress();
 		// Need to find the Mac address of the outgoing interface.
-		ArpEntry outgoingArpEntry = this.arpCache.lookup(desiredArpEntry.getIp());
+		ArpEntry outgoingArpEntry = this.arpCache.lookup(interfaceIp);
 		if (outgoingArpEntry == null)
 		{
 			System.out.println("----------------------------------");
