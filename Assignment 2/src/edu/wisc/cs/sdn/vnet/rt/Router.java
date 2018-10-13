@@ -141,23 +141,24 @@ public class Router extends Device
 			return;
 		}
 
-		// If no ArpEntry matches, your router should drop the packet.
-		ArpEntry desiredArpEntry = this.arpCache.lookup(p.getDestinationAddress());
-		if (desiredArpEntry == null)
-		{
-			System.out.println("----------------------------------");
-			System.out.println("No ArpEntry matches for destination ip, drop the packet!");
-			System.out.println("----------------------------------");
-			return;
-		}
-
-		int interfaceIp = (desiredRouteEntry.getGatewayAddress() != 0) ? desiredRouteEntry.getGatewayAddress() : desiredRouteEntry.getDestinationAddress();
-		// Need to find the Mac address of the outgoing interface.
-		ArpEntry outgoingArpEntry = this.arpCache.lookup(interfaceIp);
+		// Need to find the Mac address of the outgoing interface as source.
+		ArpEntry outgoingArpEntry = this.arpCache.lookup(desiredRouteEntry.getDestinationAddress());
 		if (outgoingArpEntry == null)
 		{
 			System.out.println("----------------------------------");
 			System.out.println("No ArpEntry matches for outgoing interface, drop the packet!");
+			System.out.println("----------------------------------");
+			return;
+		}
+
+		
+		int dstIp = (desiredRouteEntry.getGatewayAddress() != 0) ? desiredRouteEntry.getGatewayAddress() : p.getDestinationAddress();
+		// If no ArpEntry matches, your router should drop the packet.
+		ArpEntry desiredArpEntry = this.arpCache.lookup(dstIp);
+		if (desiredArpEntry == null)
+		{
+			System.out.println("----------------------------------");
+			System.out.println("No ArpEntry matches for destination ip, drop the packet!");
 			System.out.println("----------------------------------");
 			return;
 		}
