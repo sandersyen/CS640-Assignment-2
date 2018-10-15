@@ -118,7 +118,7 @@ public class Router extends Device
 			return;
 		}
 		
-		// If the packet destination IP address exactly matches one of the interface’s IP addresses, drop the packet.
+		// If the packet destination IP address exactly matches one of the interfaces IP addresses, drop the packet.
 		Map<String,Iface> tempInterfaces = this.getInterfaces();
 		for (String key : tempInterfaces.keySet())
 		{
