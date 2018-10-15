@@ -21,6 +21,7 @@ public class Switch extends Device
 {
 	private ConcurrentHashMap<MACAddress, SwitchEntry> switchTable;
 	private final long TIMEOUT = 15000;
+	private final boolean DEBUG = true;
 
 	/**
 	 * Creates a router for a specific host.
@@ -54,11 +55,13 @@ public class Switch extends Device
 		switchTable.put(srcMAC, srcEntry);
 
 		if (switchTable.containsKey(dstMAC)) {
-			SwitchEntry dstEntry = switchTable.get(dstMac);
+			SwitchEntry dstEntry = switchTable.get(dstMAC);
 			Iface outIface = dstEntry.getIface();
 			sendPacket(etherPacket, outIface);
+			if (DEBUG) {System.out.println("Contains key, send packet to " + outIface);}
 		}
 		else {
+			if (DEBUG) {System.out.println("Haven't learned, broadcast...");}
 			for (Iface ifa : interfaces.values()) {
 				if (!inIface.equals(ifa)){
 					sendPacket(etherPacket, ifa);
@@ -78,6 +81,8 @@ public class Switch extends Device
 						long leftTime = System.currentTimeMillis() - entry.getValue().getLastUpdateTime();
 						if (leftTime > TIMEOUT){
 							switchTable.remove(entry.getKey());
+							if (DEBUG) {System.out.println("Address timeout: " + entry.getKey() + " "
+								 			+ entry.getValue().getIface() + " " + leftTime + " ms");}
 						}
             		}
             	} catch(Exception e) {
