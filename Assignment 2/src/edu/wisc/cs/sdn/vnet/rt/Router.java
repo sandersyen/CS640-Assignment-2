@@ -140,6 +140,15 @@ public class Router extends Device
 			System.out.println("----------------------------------");
 			return;
 		}
+		
+		// Find an issuse when switch doing broadcast, the router will send the broadcast packet back to switch.
+		if (desiredRouteEntry.getInterface() == inIface)
+		{
+			System.out.println("----------------------------------");
+			System.out.println("Should not send the broadcast packet back to switch, drop the packet!");
+			System.out.println("----------------------------------");
+			return;
+		}
 
 		// Need to find the Mac address of the outgoing interface as source.
 		ArpEntry outgoingArpEntry = this.arpCache.lookup(desiredRouteEntry.getInterface().getIpAddress());
@@ -172,7 +181,8 @@ public class Router extends Device
 		p.resetChecksum();
 		p.serialize();
 
-		System.out.println("Send the frame out the correct interface: " + desiredRouteEntry.getInterface());
+		System.out.println("Send the packet out of interface: " + desiredRouteEntry.getInterface());
+		
 		sendPacket(etherPacket, desiredRouteEntry.getInterface());
 		
 		/********************************************************************/
