@@ -43,8 +43,8 @@ public class RouteTable
             int longestPrefix = 0x00000000;
             for (RouteEntry entry : this.entries)
             {
-                int destAddr = entry.getDestinationAddress;
-                int subnetMask = entry.getMaskAddress;
+                int destAddr = entry.getDestinationAddress();
+                int subnetMask = entry.getMaskAddress();
                 if (((destAddr & subnetMask) == (ip & subnetMask)) &&
                     (subnetMask > longestPrefix))
                 {
