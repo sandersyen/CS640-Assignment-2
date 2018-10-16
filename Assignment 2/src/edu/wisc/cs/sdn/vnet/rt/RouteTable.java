@@ -40,13 +40,13 @@ public class RouteTable
 			/*****************************************************************/
 			/* TODO: Find the route entry with the longest prefix match      */
 			RouteEntry searchEntry = null;
-            int longestPrefix = Integer.MIN_VALUE;
+            int longestPrefix = 0;
             for (RouteEntry entry : this.entries)
             {
                 int destAddr = entry.getDestinationAddress();
-                int subnetMask = entry.getMaskAddress();
+                int subnetMask = entry.getMaskAddress(); 
                 if (((destAddr & subnetMask) == (ip & subnetMask)) &&
-                    ((subnetMask) > longestPrefix))
+                    ((longestPrefix == 0) || (subnetMask > longestPrefix)))
                 {
                     searchEntry = entry;
                     longestPrefix = subnetMask;
