@@ -21,7 +21,7 @@ public class Switch extends Device
 {
 	private ConcurrentHashMap<MACAddress, SwitchEntry> switchTable;
 	private final long TIMEOUT = 15000;
-	private final boolean DEBUG = true;
+	private final boolean DEBUG = false;
 
 	/**
 	 * Creates a router for a specific host.
