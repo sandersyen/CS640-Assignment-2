@@ -142,7 +142,7 @@ public class Router extends Device
 		}
 
 		// Need to find the Mac address of the outgoing interface as source.
-		ArpEntry outgoingArpEntry = this.arpCache.lookup(desiredRouteEntry.getDestinationAddress());
+		ArpEntry outgoingArpEntry = this.arpCache.lookup(desiredRouteEntry.getInterface().getIpAddress());
 		if (outgoingArpEntry == null)
 		{
 			System.out.println("----------------------------------");
