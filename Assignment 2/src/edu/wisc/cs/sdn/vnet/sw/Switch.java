@@ -20,8 +20,8 @@ import static java.util.concurrent.TimeUnit.*;
 public class Switch extends Device
 {
 	private ConcurrentHashMap<MACAddress, SwitchEntry> switchTable;
-	private final long TIMEOUT = 15000;
-	private final boolean DEBUG = false;
+	private final long TIMEOUT = 15000;   // set time limit
+	private final boolean DEBUG = false;  // debug enable
 
 	/**
 	 * Creates a router for a specific host.
@@ -52,18 +52,18 @@ public class Switch extends Device
 		MACAddress dstMAC = etherPacket.getDestinationMAC();
 
 		SwitchEntry srcEntry = new SwitchEntry(srcMAC, inIface);
-		switchTable.put(srcMAC, srcEntry);
+		switchTable.put(srcMAC, srcEntry);			// learn src MAC
 
-		if (switchTable.containsKey(dstMAC)) {
+		if (switchTable.containsKey(dstMAC)) {    // if learned, sent to corresponding iface
 			SwitchEntry dstEntry = switchTable.get(dstMAC);
 			Iface outIface = dstEntry.getIface();
 			sendPacket(etherPacket, outIface);
 			if (DEBUG) {System.out.println("Contains key, send packet to " + outIface);}
 		}
-		else {
+		else {    // if not learned, just broadcast
 			if (DEBUG) {System.out.println("Haven't learned, broadcast...");}
 			for (Iface ifa : interfaces.values()) {
-				if (!inIface.equals(ifa)){
+				if (!inIface.equals(ifa)){   //broadcast except sender itself
 					sendPacket(etherPacket, ifa);
 				}
 			}
@@ -89,7 +89,7 @@ public class Switch extends Device
 					e.printStackTrace(System.out);
 				}
             }
-        }, 0, 1, SECONDS);
+        }, 0, 1, SECONDS);  // check every second
     }
 }
 

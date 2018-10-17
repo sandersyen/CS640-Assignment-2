@@ -44,9 +44,9 @@ public class RouteTable
             for (RouteEntry entry : this.entries)
             {
                 int destAddr = entry.getDestinationAddress();
-                int subnetMask = entry.getMaskAddress(); 
+                int subnetMask = entry.getMaskAddress();
                 if (((destAddr & subnetMask) == (ip & subnetMask)) &&
-                    ((longestPrefix == 0) || (subnetMask > longestPrefix)))
+                    ((longestPrefix == 0) || (subnetMask > longestPrefix)))  // consider subnet mask 0.0.0.0
                 {
                     searchEntry = entry;
                     longestPrefix = subnetMask;
