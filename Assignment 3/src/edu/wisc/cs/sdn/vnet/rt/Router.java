@@ -6,6 +6,8 @@ import edu.wisc.cs.sdn.vnet.Iface;
 
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.IPv4;
+import net.floodlightcontroller.packet.ICMP;
+import net.floodlightcontroller.packet.Data;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
@@ -112,6 +114,7 @@ public class Router extends Device
 
 		// Drop the packet if TTL is less than 1
 		if ((int)p.getTtl() <= 0) {
+			generateIcmpMessage(p, inIface, (byte)11, (byte)0);
 			System.out.println("----------------------------------");
 			System.out.println("TTL is 0, drop the packet!");
 			System.out.println("----------------------------------");
@@ -124,10 +127,23 @@ public class Router extends Device
 		{
 			if (tempInterfaces.get(key).getIpAddress() == p.getDestinationAddress())
 			{
-				System.out.println("----------------------------------");
-				System.out.println("the packet destination IP address matches, drop the packet!");
-				System.out.println("----------------------------------");
-				return;
+				boolean drop = true;
+				if (p.getProtocol() == IPv4.PROTOCOL_UDP || p.getProtocol() == IPv4.PROTOCOL_TCP) {
+					generateIcmpMessage(p, inIface, (byte)3, (byte)3);
+				} else if (p.getProtocol() == IPv4.PROTOCOL_ICMP) {
+					ICMP icmpPacket = (ICMP)p.getPayload();
+					if (icmpPacket.getIcmpType() == ICMP.TYPE_ECHO_REQUEST) {
+						generateIcmpMessage(p, inIface, (byte)0, (byte)0);
+						drop = false;
+					}
+				}
+
+				if (drop) {
+					System.out.println("----------------------------------");
+					System.out.println("the packet destination IP address matches, drop the packet!");
+					System.out.println("----------------------------------");
+					return;
+				}
 			}
 		}
 
@@ -135,6 +151,7 @@ public class Router extends Device
 		RouteEntry desiredRouteEntry = this.routeTable.lookup(p.getDestinationAddress());
 		if (desiredRouteEntry == null)
 		{
+			generateIcmpMessage(p, inIface, (byte)3, (byte)0);
 			System.out.println("----------------------------------");
 			System.out.println("No RouteEntry matches, drop the packet!");
 			System.out.println("----------------------------------");
@@ -166,6 +183,7 @@ public class Router extends Device
 		ArpEntry desiredArpEntry = this.arpCache.lookup(dstIp);
 		if (desiredArpEntry == null)
 		{
+			generateIcmpMessage(p, inIface, (byte)3, (byte)1);
 			System.out.println("----------------------------------");
 			System.out.println("No ArpEntry matches for destination ip, drop the packet!");
 			System.out.println("----------------------------------");
@@ -215,4 +233,89 @@ public class Router extends Device
 		
         return checksum == packet.getChecksum();
 	}
+
+	/**
+	 * Generate ICMP message for different cases.	 
+	 * @param packet the IPv4 packet that was received.
+	 * @return the correctness of a Ethernet packet. 
+	 */
+	private void generateIcmpMessage(IPv4 packet, Iface inIface, byte type, byte code)
+	{
+		Ethernet ether = new Ethernet();
+		ether.setEtherType(Ethernet.TYPE_IPv4);
+
+		IPv4 ip = new IPv4();
+		ip.setTtl((byte)64);
+		ip.setProtocol(IPv4.PROTOCOL_ICMP);
+		ip.setSourceAddress(inIface.getIpAddress());
+		ip.setDestinationAddress(packet.getSourceAddress());
+
+		ICMP icmp = new ICMP();
+		icmp.setIcmpType(type);
+		icmp.setIcmpCode(code);
+
+		Data data = new Data();
+
+		if (type != 0) {
+			int oriPacketHeaderLength = packet.getHeaderLength() * 4;
+			byte[] ICMPPayload = new byte[4 + oriPacketHeaderLength + 8];
+			byte[] oriIPPacket = packet.serialize();
+			for (int i = 0; i < (oriPacketHeaderLength + 8); ++i) {
+				ICMPPayload[i + 4] = oriIPPacket[i];
+			}
+			data.setData(ICMPPayload);
+		} else {
+			ICMP icmpPacket = (ICMP)packet.getPayload();
+			ip.setSourceAddress(packet.getDestinationAddress());
+			data.setData(icmpPacket.getPayload().serialize());
+		}
+		ether.setPayload(ip);
+		ip.setPayload(icmp);
+		icmp.setPayload(data);
+
+		this.forwardIpPacket(ether, null);
+	}
+
+	// get this part of code from TA's solutions, it should be more reliable than ours.
+	private void forwardIpPacket(Ethernet etherPacket, Iface inIface)
+    {
+        // Make sure it's an IP packet
+		if (etherPacket.getEtherType() != Ethernet.TYPE_IPv4)
+		{ return; }
+        System.out.println("Forward IP packet");
+		
+		// Get IP header
+		IPv4 ipPacket = (IPv4)etherPacket.getPayload();
+        int dstAddr = ipPacket.getDestinationAddress();
+
+        // Find matching route table entry 
+        RouteEntry bestMatch = this.routeTable.lookup(dstAddr);
+
+        // If no entry matched, do nothing
+        if (null == bestMatch)
+        {
+			generateIcmpMessage(ipPacket, inIface, (byte)3, (byte)0);
+			return; }
+
+        // Make sure we don't sent a packet back out the interface it came in
+        Iface outIface = bestMatch.getInterface();
+        if (outIface == inIface)
+        { return; }
+
+        // Set source MAC address in Ethernet header
+        etherPacket.setSourceMACAddress(outIface.getMacAddress().toBytes());
+
+        // If no gateway, then nextHop is IP destination
+        int nextHop = bestMatch.getGatewayAddress();
+        if (0 == nextHop)
+        { nextHop = dstAddr; }
+
+        // Set destination MAC address in Ethernet header
+        ArpEntry arpEntry = this.arpCache.lookup(nextHop);
+        if (null == arpEntry)
+        { return; }
+        etherPacket.setDestinationMACAddress(arpEntry.getMac().toBytes());
+        
+        this.sendPacket(etherPacket, outIface);
+    }
 }
