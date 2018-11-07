@@ -2,7 +2,6 @@ package edu.wisc.cs.sdn.vnet.rt;
 
 import net.floodlightcontroller.packet.IPv4;
 import edu.wisc.cs.sdn.vnet.Iface;
-
 /**
  * An entry in a route table.
  * @author Aaron Gember-Jacobson and Anubhavnidhi Abhashkumar
@@ -22,6 +21,9 @@ public class RouteEntry
 	 * the destination or gateway */
 	private Iface iface;
 	
+	private long time;
+	private int distance;
+
 	/**
 	 * Create a new route table entry.
 	 * @param destinationAddress destination IP address
@@ -77,5 +79,21 @@ public class RouteEntry
 				IPv4.fromIPv4Address(this.gatewayAddress),
 				IPv4.fromIPv4Address(this.maskAddress),
 				this.iface.getName());
+	}
+
+	/**
+	 * @return distance vector
+	 */
+	public int getDistance()
+	{ return this.distance; }
+
+    public void setDistance(int distance)
+	{ this.distance = distance; }
+	
+	public long getTime() {
+		return this.time;
+	}
+	public void setTime() {
+		this.time = System.currentTimeMillis();
 	}
 }

@@ -10,6 +10,9 @@ import net.floodlightcontroller.packet.ICMP;
 import net.floodlightcontroller.packet.Data;
 import net.floodlightcontroller.packet.MACAddress;
 import net.floodlightcontroller.packet.ARP;
+import net.floodlightcontroller.packet.RIPv2;
+import net.floodlightcontroller.packet.RIPv2Entry;
+import net.floodlightcontroller.packet.UDP;
 
 import java.nio.ByteBuffer;
 import java.util.Timer;
@@ -34,6 +37,9 @@ public class Router extends Device
 	private ConcurrentHashMap<Integer, List<Ethernet>> arpQueue;
 	
 	private final boolean DEBUG_ARP = true;  // debug enable
+
+	private Timer sendTimer;
+	private Timer cleanTimer;
 
 	/**
 	 * Creates a router for a specific host.
@@ -165,6 +171,36 @@ public class Router extends Device
 			return;
 		}
 
+		if (p.getProtocol() == IPv4.PROTOCOL_UDP) {
+			UDP udpPacket = (UDP)p.getPayload();
+			if (udpPacket.getDestinationPort() == UDP.RIP_PORT && p.getDestinationAddress() == IPv4.toIPv4Address("224.0.0.9")) {
+				RouteEntry inEntry = routeTable.lookup(p.getSourceAddress());
+				//Packets that match this criteria are RIP requests or responses. 
+				RIPv2 rip = (RIPv2) udpPacket.getPayload();
+				if (rip.getCommand() == RIPv2.COMMAND_RESPONSE) {
+					for (RIPv2Entry entry : rip.getEntries()) {
+						RouteEntry routeEntry = routeTable.lookup(entry.getAddress());
+						//If the term in RIP is not in the table
+						if (routeEntry==null) {
+							routeTable.insert(entry.getAddress() & entry.getSubnetMask(), p.getSourceAddress(), entry.getSubnetMask(), inIface, entry.getMetric() + 1);
+						} else {
+							if (routeEntry.getDistance() > (entry.getMetric() + inEntry.getDistance() + 1)) {
+								routeTable.update(entry.getAddress() & entry.getSubnetMask(), entry.getSubnetMask(), p.getSourceAddress(), inIface, (entry.getMetric() + inEntry.getDistance()));
+								this.sendUnsolicitedRIP();
+							}
+						}
+						routeTable.update_time(entry.getAddress() & entry.getSubnetMask(), entry.getSubnetMask());
+					}
+				} else if (rip.getCommand() == RIPv2.COMMAND_REQUEST) {
+					sendPacket(this.generateRipPacket(etherPacket, inIface, true, RIPv2.COMMAND_RESPONSE), inIface);
+				}
+				System.out.println("----------------------------------");
+				System.out.println("The packet is RIP packet!");
+				System.out.println("----------------------------------");
+				return;
+			}
+		}
+
 		// If the packet destination IP address exactly matches one of the interfaces IP addresses, drop the packet.
 		Map<String,Iface> tempInterfaces = this.getInterfaces();
 		for (String key : tempInterfaces.keySet())
@@ -172,6 +208,7 @@ public class Router extends Device
 			if (tempInterfaces.get(key).getIpAddress() == p.getDestinationAddress())
 			{
 				boolean drop = true;
+
 				if (p.getProtocol() == IPv4.PROTOCOL_UDP || p.getProtocol() == IPv4.PROTOCOL_TCP) {
 					generateIcmpMessage(p, inIface, (byte)3, (byte)3);
 				} else if (p.getProtocol() == IPv4.PROTOCOL_ICMP) {
@@ -181,6 +218,7 @@ public class Router extends Device
 						drop = false;
 					}
 				}
+
 
 				if (drop) {
 					System.out.println("----------------------------------");
@@ -516,4 +554,97 @@ public class Router extends Device
 		sendPacket(arpRequestPacket, outIface);
 	}
 	
+	public void startingRIP()
+	{
+		for (Iface entry : this.getInterfaces().values()) {
+			this.getRouteTable().insert(entry.getIpAddress() & entry.getSubnetMask(), 0, entry.getSubnetMask(), entry);
+
+			// send RIP request 
+			sendPacket(generateRipPacket(new Ethernet(), entry, false, RIPv2.COMMAND_REQUEST), entry);
+		}
+
+		// send an unsolicited RIP response out all of the routers interfaces every 10 seconds thereafter.
+		this.sendTimer = new Timer();
+		this.sendTimer.scheduleAtFixedRate(new unsolicitedRIP(), 10000, 10000);
+
+		// Your router should time out route table entries for which an update has not been received for more than 30 seconds. 
+		this.cleanTimer = new Timer();
+		this.cleanTimer.scheduleAtFixedRate(new timeOutRIP(), 1000, 1000);
+	}
+
+	private Ethernet generateRipPacket(Ethernet packet, Iface inIface, boolean isSpecific, byte command)
+	{
+		IPv4 sourceIpv4 = (IPv4) packet.getPayload();
+		Ethernet ether = new Ethernet();
+		ether.setEtherType(Ethernet.TYPE_IPv4);
+		ether.setSourceMACAddress(inIface.getMacAddress().toString());
+		IPv4 ip = new IPv4();
+		ip.setSourceAddress(inIface.getIpAddress());
+		ip.setTtl((byte)15);
+		UDP udp = new UDP();
+		udp.setSourcePort(UDP.RIP_PORT);		
+		udp.setDestinationPort(UDP.RIP_PORT);
+
+		RIPv2 rip = new RIPv2();
+
+		ether.setPayload(ip);
+		ip.setPayload(udp);
+		udp.setPayload(rip);
+
+		if (isSpecific) {
+			ether.setDestinationMACAddress(packet.getSourceMACAddress().toString());
+			ip.setDestinationAddress(sourceIpv4.getSourceAddress());
+		} else {
+			ether.setDestinationMACAddress("FF:FF:FF:FF:FF:FF");
+			ip.setDestinationAddress("224.0.0.9");
+		}
+
+		// construct rip table into rip packet
+
+		for (RouteEntry entry : this.routeTable.getEntries())
+		{
+			int address = entry.getDestinationAddress();
+			int mask = entry.getMaskAddress();
+			int next = inIface.getIpAddress();
+			int distance = entry.getDistance();
+			
+			RIPv2Entry ripEntry = new RIPv2Entry(address, mask, distance);
+			ripEntry.setNextHopAddress(next);
+			rip.addEntry(ripEntry);
+		}
+		
+		ether.serialize();
+
+		return ether;
+	}
+
+	public void sendUnsolicitedRIP()
+	{
+		for (Iface entry : this.interfaces.values()) {
+			// send an unsolicited RIP response
+			sendPacket(generateRipPacket(new Ethernet(), entry, false, RIPv2.COMMAND_RESPONSE), entry);
+		}
+		return;
+	}
+	
+	public void cleanRIPTable()
+	{
+		this.getRouteTable().cleanTable();
+	}
+
+	class unsolicitedRIP extends TimerTask
+	{
+		public void run()
+		{
+			sendUnsolicitedRIP();
+		}
+	}
+
+	class timeOutRIP extends TimerTask
+	{
+		public void run()
+		{
+			cleanRIPTable();
+		}
+	}
 }

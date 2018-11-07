@@ -166,6 +166,26 @@ public class RouteTable
 	}
 
 	/**
+	 * Add an entry to the route table.
+	 * @param dstIp destination IP
+	 * @param gwIp gateway IP
+	 * @param maskIp subnet mask
+	 * @param iface router interface out which to send packets to reach the
+	 *        destination or gateway
+	 * @param distance distance vecotor of router interface
+	 */
+	public void insert(int dstIp, int gwIp, int maskIp, Iface iface, int distance)
+	{
+		RouteEntry entry = new RouteEntry(dstIp, gwIp, maskIp, iface);
+		entry.setDistance(distance);
+		synchronized(this.entries)
+        {
+            this.entries.add(entry);
+        }
+
+	}
+
+	/**
 	 * Remove an entry from the route table.
 	 * @param dstIP destination IP of the entry to remove
      * @param maskIp subnet mask of the entry to remove
@@ -205,6 +225,45 @@ public class RouteTable
         return true;
 	}
 
+	/**
+	 * Update an entry in the route table.
+	 * @param dstIP destination IP of the entry to update
+     * @param maskIp subnet mask of the entry to update
+	 * @param gatewayAddress new gateway IP address for matching entry
+	 * @param iface new router interface for matching entry
+	 * @param distance distance vecotor of router interface
+     * @return true if a matching entry was found and updated, otherwise false
+	 */
+	public boolean update(int dstIp, int maskIp, int gwIp,
+            Iface iface, int distance)
+	{
+        synchronized(this.entries)
+        {
+            RouteEntry entry = this.find(dstIp, maskIp);
+            if (null == entry)
+            { return false; }
+            entry.setGatewayAddress(gwIp);
+			entry.setInterface(iface);
+			entry.setDistance(distance);
+        }
+        return true;
+	}
+
+	/**
+	 * Update an entry in the route table.
+	 * @param dstIP destination IP of the entry to update
+     * @param maskIp subnet mask of the entry to update
+	 */
+	public void update_time(int dstIp,int maskIp){
+		synchronized(this.entries)
+        {
+            RouteEntry entry = this.find(dstIp, maskIp);
+            if (null == entry)
+            { return ;}
+			entry.setTime();
+        }
+	}
+
     /**
 	 * Find an entry in the route table.
 	 * @param dstIP destination IP of the entry to find
@@ -237,5 +296,20 @@ public class RouteTable
             { result += entry.toString()+"\n"; }
 		    return result;
         }
+	}
+
+	public List<RouteEntry> getEntries() {
+		return this.entries;
+	}
+
+	public synchronized void cleanTable(){
+		long curTime = System.currentTimeMillis();
+		
+		for (RouteEntry entry : this.getEntries()) {
+			if(entry != null && (curTime - entry.getTime()) > (30 * 1000)){
+				System.out.println("Removing......");
+				this.getEntries().remove(entry);
+			}
+		}
 	}
 }
