@@ -280,6 +280,7 @@ public class Router extends Device
         ArpEntry desiredArpEntry = this.arpCache.lookup(nextHop);
         if (null == desiredArpEntry)
         { 
+			generateIcmpMessage(ipPacket, inIface, (byte)3, (byte)1);
             System.out.println("----------------------------------");
      		System.out.println("No ArpEntry matches for destination ip, start to send ARP requests!");
      		System.out.println("----------------------------------");
