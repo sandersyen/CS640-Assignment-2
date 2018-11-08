@@ -165,7 +165,7 @@ public class Router extends Device
 
 		// Drop the packet if TTL is less than 1
 		if ((int)p.getTtl() <= 0) {
-			generateIcmpMessage(p, inIface, (byte)11, (byte)0);
+			generateIcmpMessage(etherPacket, inIface, (byte)11, (byte)0);
 			System.out.println("----------------------------------");
 			System.out.println("TTL is 0, drop the packet!");
 			System.out.println("----------------------------------");
@@ -215,14 +215,14 @@ public class Router extends Device
 				boolean drop = true;
 
 				if (p.getProtocol() == IPv4.PROTOCOL_UDP || p.getProtocol() == IPv4.PROTOCOL_TCP) {
-					generateIcmpMessage(p, inIface, (byte)3, (byte)3);
+					generateIcmpMessage(etherPacket, inIface, (byte)3, (byte)3);
 				} else if (p.getProtocol() == IPv4.PROTOCOL_ICMP) {
 					ICMP icmpPacket = (ICMP)p.getPayload();
 					if (icmpPacket.getIcmpType() == ICMP.TYPE_ECHO_REQUEST) {
-						generateIcmpMessage(p, inIface, (byte)0, (byte)0);
+						generateIcmpMessage(etherPacket, inIface, (byte)0, (byte)0);
 						drop = false;
 					}
-				}
+				};
 
 
 				if (drop) {
@@ -252,7 +252,7 @@ public class Router extends Device
         // If no RouteEntry matches, your router should drop the packet.
      	if (desiredRouteEntry == null)
      	{
-     		generateIcmpMessage(ipPacket, inIface, (byte)3, (byte)0);
+     		generateIcmpMessage(etherPacket, inIface, (byte)3, (byte)0);
      		System.out.println("----------------------------------");
      		System.out.println("No RouteEntry matches, drop the packet!");
      		System.out.println("----------------------------------");
@@ -280,7 +280,7 @@ public class Router extends Device
         ArpEntry desiredArpEntry = this.arpCache.lookup(nextHop);
         if (null == desiredArpEntry)
         { 
-			generateIcmpMessage(ipPacket, inIface, (byte)3, (byte)1);
+			//generateIcmpMessage(ipPacket, inIface, (byte)3, (byte)1);
             System.out.println("----------------------------------");
      		System.out.println("No ArpEntry matches for destination ip, start to send ARP requests!");
      		System.out.println("----------------------------------");
@@ -358,10 +358,14 @@ public class Router extends Device
 	 * @param packet the IPv4 packet that was received.
 	 * @return the correctness of a Ethernet packet.
 	 */
-	private void generateIcmpMessage(IPv4 packet, Iface inIface, byte type, byte code)
+	private void generateIcmpMessage(Ethernet etherPacket, Iface inIface, byte type, byte code)
 	{
+		IPv4 packet = (IPv4) etherPacket.getPayload();
 		Ethernet ether = new Ethernet();
 		ether.setEtherType(Ethernet.TYPE_IPv4);
+	   	ether.setSourceMACAddress(inIface.getMacAddress().toBytes());
+    	ether.setDestinationMACAddress(etherPacket.getSourceMACAddress());
+
 
 		IPv4 ip = new IPv4();
 		ip.setTtl((byte)64);
@@ -392,7 +396,7 @@ public class Router extends Device
 		ip.setPayload(icmp);
 		icmp.setPayload(data);
 
-		this.forwardIpPacket(ether, null);
+		this.sendPacket(ether, inIface);
 	}
 
 	/*******************************************************************/
@@ -497,8 +501,11 @@ public class Router extends Device
 		            			if (count > 2) {
 		            				if (DEBUG_ARP) 
 		            				{ System.out.println("-----Time Out, Drop this queue-----");}
+		            				List<Ethernet> dropQueue = arpQueue.get(dstip);
 		            				arpQueue.remove(dstip);
-		            				generateIcmpMessage((IPv4) etherPacket.getPayload(), inIface, (byte)3, (byte)1);
+		            				for (Ethernet ether: dropQueue) {
+		            					generateIcmpMessage(ether, inIface, (byte)3, (byte)1);
+		            				}
 		            				this.cancel();
 		            			}
 		            			else {
