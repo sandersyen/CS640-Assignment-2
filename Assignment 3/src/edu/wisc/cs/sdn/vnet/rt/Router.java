@@ -36,7 +36,8 @@ public class Router extends Device
 	/** ARP queue **/
 	private ConcurrentHashMap<Integer, List<Ethernet>> arpQueue;
 	
-	private final boolean DEBUG_ARP = true;  // debug enable
+	private final boolean DEBUG_ARP = true;  // ARP debug switch
+	private final boolean DEBUG_RIP = true;  // RIP debug switch
 
 	private Timer sendTimer;
 	private Timer cleanTimer;
@@ -182,7 +183,7 @@ public class Router extends Device
 						RouteEntry routeEntry = routeTable.lookup(entry.getAddress());
 						//If the term in RIP is not in the table
 						if (routeEntry==null) {
-							routeTable.insert(entry.getAddress() & entry.getSubnetMask(), p.getSourceAddress(), entry.getSubnetMask(), inIface, entry.getMetric() + 1);
+							routeTable.insert(entry.getAddress() & entry.getSubnetMask(), p.getSourceAddress(), entry.getSubnetMask(), inIface, entry.getMetric() + 1, false);
 						} else {
 							if (routeEntry.getDistance() > (entry.getMetric() + inEntry.getDistance() + 1)) {
 								routeTable.update(entry.getAddress() & entry.getSubnetMask(), entry.getSubnetMask(), p.getSourceAddress(), inIface, (entry.getMetric() + inEntry.getDistance()));
@@ -507,6 +508,7 @@ public class Router extends Device
 		            		}
 		            	} catch(Exception e) {
 							e.printStackTrace(System.out);
+							this.cancel();
 						}
 		            }
 				}, 0, 1000);
@@ -539,11 +541,18 @@ public class Router extends Device
 		this.sendPacket(arpRequestPacket, outIface);
 	}
 	
+	/*******************************************************************/
+	/*******************************RIP*********************************/
+	/*******************************************************************/
+	
 	public void startingRIP()
 	{
+		if (DEBUG_RIP) 
+		{ System.out.println("-----init RIP-----");}
 		for (Iface entry : this.getInterfaces().values()) {
-			this.getRouteTable().insert(entry.getIpAddress() & entry.getSubnetMask(), 0, entry.getSubnetMask(), entry);
-
+			this.getRouteTable().insert(entry.getIpAddress() & entry.getSubnetMask(), 0, entry.getSubnetMask(), entry, 0, true);
+			if (DEBUG_RIP) 
+			{ System.out.println("-----add entry " + (entry.getIpAddress() & entry.getSubnetMask()) + " to router table-----");}
 			// send RIP request 
 			sendPacket(generateRipPacket(new Ethernet(), entry, false, RIPv2.COMMAND_REQUEST), entry);
 		}
@@ -605,6 +614,8 @@ public class Router extends Device
 
 	public void sendUnsolicitedRIP()
 	{
+		if (DEBUG_RIP) 
+		{ System.out.println("-----send unsolicited RIP responses-----");}
 		for (Iface entry : this.interfaces.values()) {
 			// send an unsolicited RIP response
 			sendPacket(generateRipPacket(new Ethernet(), entry, false, RIPv2.COMMAND_RESPONSE), entry);
@@ -621,7 +632,12 @@ public class Router extends Device
 	{
 		public void run()
 		{
-			sendUnsolicitedRIP();
+			try{
+				sendUnsolicitedRIP();
+			} catch (Exception e) {
+				e.printStackTrace(System.out);
+				this.cancel();
+			}
 		}
 	}
 
@@ -629,7 +645,12 @@ public class Router extends Device
 	{
 		public void run()
 		{
-			cleanRIPTable();
+			try{
+				getRouteTable().cleanTable();
+			} catch (Exception e) {
+				e.printStackTrace(System.out);
+				this.cancel();
+			}
 		}
 	}
 }

@@ -172,12 +172,14 @@ public class RouteTable
 	 * @param maskIp subnet mask
 	 * @param iface router interface out which to send packets to reach the
 	 *        destination or gateway
-	 * @param distance distance vecotor of router interface
+	 * @param distance distance vector of router interface
+	 * @param directReachable record whether this entry is directly reachable via thisrouter's interface
 	 */
-	public void insert(int dstIp, int gwIp, int maskIp, Iface iface, int distance)
+	public void insert(int dstIp, int gwIp, int maskIp, Iface iface, int distance, boolean directReachable)
 	{
 		RouteEntry entry = new RouteEntry(dstIp, gwIp, maskIp, iface);
 		entry.setDistance(distance);
+		entry.setDirectReachable(directReachable);
 		synchronized(this.entries)
         {
             this.entries.add(entry);
@@ -304,9 +306,8 @@ public class RouteTable
 
 	public synchronized void cleanTable(){
 		long curTime = System.currentTimeMillis();
-		
 		for (RouteEntry entry : this.getEntries()) {
-			if(entry != null && (curTime - entry.getTime()) > (30 * 1000)){
+			if((entry != null) && (!entry.directReachable()) && ((curTime - entry.getTime()) > (30 * 1000))){
 				System.out.println("Removing......");
 				this.getEntries().remove(entry);
 			}

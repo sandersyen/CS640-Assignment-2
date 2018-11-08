@@ -21,6 +21,8 @@ public class RouteEntry
 	 * the destination or gateway */
 	private Iface iface;
 	
+	private boolean directReachable;
+	
 	private long time;
 	private int distance;
 
@@ -80,7 +82,13 @@ public class RouteEntry
 				IPv4.fromIPv4Address(this.maskAddress),
 				this.iface.getName());
 	}
-
+	
+	public boolean directReachable()
+	{ return this.directReachable; }
+	
+	public void setDirectReachable(boolean directReachable)
+	{ this.directReachable = directReachable; }
+	
 	/**
 	 * @return distance vector
 	 */
