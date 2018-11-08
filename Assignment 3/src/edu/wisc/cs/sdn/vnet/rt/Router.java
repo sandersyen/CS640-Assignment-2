@@ -174,33 +174,8 @@ public class Router extends Device
 
 		if (p.getProtocol() == IPv4.PROTOCOL_UDP) {
 			UDP udpPacket = (UDP)p.getPayload();
-			if (udpPacket.getDestinationPort() == UDP.RIP_PORT && p.getDestinationAddress() == IPv4.toIPv4Address("224.0.0.9")) {
-				RouteEntry inEntry = routeTable.lookup(p.getSourceAddress());
-				//Packets that match this criteria are RIP requests or responses. 
-				RIPv2 rip = (RIPv2) udpPacket.getPayload();
-				if (rip.getCommand() == RIPv2.COMMAND_RESPONSE) {
-					for (RIPv2Entry entry : rip.getEntries()) {
-						RouteEntry routeEntry = routeTable.lookup(entry.getAddress());
-						//If the term in RIP is not in the table
-						if (routeEntry==null) {
-							routeTable.insert(entry.getAddress() & entry.getSubnetMask(), p.getSourceAddress(), entry.getSubnetMask(), inIface, entry.getMetric() + 1, false);
-						} else {
-							if (routeEntry.getDistance() > (entry.getMetric() + inEntry.getDistance() + 1)) {
-								routeTable.update(entry.getAddress() & entry.getSubnetMask(), entry.getSubnetMask(), p.getSourceAddress(), inIface, (entry.getMetric() + inEntry.getDistance()));
-								this.sendUnsolicitedRIP();
-							}
-						}
-						routeTable.update_time(entry.getAddress() & entry.getSubnetMask(), entry.getSubnetMask());
-					}
-				} else if (rip.getCommand() == RIPv2.COMMAND_REQUEST) {
-					sendPacket(this.generateRipPacket(etherPacket, inIface, true, RIPv2.COMMAND_RESPONSE), inIface);
-				}
-				System.out.println("----------------------------------");
-				System.out.println("The packet is RIP packet, update route table!");
-				if (DEBUG_RIP) 
-				{ System.out.print(this.routeTable.toString()); }
-				System.out.println("----------------------------------");
-				return;
+			if (udpPacket.getDestinationPort() == UDP.RIP_PORT && udpPacket.getSourcePort() == UDP.RIP_PORT && p.getDestinationAddress() == IPv4.toIPv4Address("224.0.0.9")) {
+				handleRIPPacket(etherPacket, inIface);
 			}
 		}
 
@@ -214,6 +189,13 @@ public class Router extends Device
 		{
 			if (tempInterfaces.get(key).getIpAddress() == p.getDestinationAddress())
 			{
+				if (p.getProtocol() == IPv4.PROTOCOL_UDP) {
+					UDP udpPacket = (UDP)p.getPayload();
+					if (udpPacket.getDestinationPort() == UDP.RIP_PORT && udpPacket.getSourcePort() == UDP.RIP_PORT){
+						handleRIPPacket(etherPacket, inIface);
+					}
+				}
+				
 				boolean drop = true;
 
 				if (p.getProtocol() == IPv4.PROTOCOL_UDP || p.getProtocol() == IPv4.PROTOCOL_TCP) {
@@ -578,7 +560,38 @@ public class Router extends Device
 		this.cleanTimer = new Timer();
 		this.cleanTimer.scheduleAtFixedRate(new timeOutRIP(), 1000, 1000);
 	}
-
+	
+	private void handleRIPPacket(Ethernet etherPacket, Iface inIface) {
+		IPv4 p = (IPv4) etherPacket.getPayload();
+		UDP udpPacket = (UDP)p.getPayload();
+		RouteEntry inEntry = routeTable.lookup(p.getSourceAddress());
+		//Packets that match this criteria are RIP requests or responses. 
+		RIPv2 rip = (RIPv2) udpPacket.getPayload();
+		if (rip.getCommand() == RIPv2.COMMAND_RESPONSE) {
+			for (RIPv2Entry entry : rip.getEntries()) {
+				RouteEntry routeEntry = routeTable.lookup(entry.getAddress());
+				//If the term in RIP is not in the table
+				if (routeEntry==null) {
+					routeTable.insert(entry.getAddress() & entry.getSubnetMask(), p.getSourceAddress(), entry.getSubnetMask(), inIface, entry.getMetric() + 1, false);
+				} else {
+					if (routeEntry.getDistance() > (entry.getMetric() + inEntry.getDistance() + 1)) {
+						routeTable.update(entry.getAddress() & entry.getSubnetMask(), entry.getSubnetMask(), p.getSourceAddress(), inIface, (entry.getMetric() + inEntry.getDistance()));
+						this.sendUnsolicitedRIP();
+					}
+				}
+				routeTable.update_time(entry.getAddress() & entry.getSubnetMask(), entry.getSubnetMask());
+			}
+		} else if (rip.getCommand() == RIPv2.COMMAND_REQUEST) {
+			sendPacket(this.generateRipPacket(etherPacket, inIface, true, RIPv2.COMMAND_RESPONSE), inIface);
+		}
+		if (DEBUG_RIP) {
+			System.out.println("----------------------------------");
+			System.out.println("The packet is RIP packet, update route table!");
+			System.out.print(this.routeTable.toString());
+			System.out.println("----------------------------------");
+		}
+	}
+	
 	private Ethernet generateRipPacket(Ethernet packet, Iface inIface, boolean isSpecific, byte command)
 	{
 		IPv4 sourceIpv4 = (IPv4) packet.getPayload();
