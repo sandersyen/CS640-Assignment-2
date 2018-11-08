@@ -196,7 +196,9 @@ public class Router extends Device
 					sendPacket(this.generateRipPacket(etherPacket, inIface, true, RIPv2.COMMAND_RESPONSE), inIface);
 				}
 				System.out.println("----------------------------------");
-				System.out.println("The packet is RIP packet!");
+				System.out.println("The packet is RIP packet, update route table!");
+				if (DEBUG_RIP) 
+				{ System.out.print(this.routeTable.toString()); }
 				System.out.println("----------------------------------");
 				return;
 			}
@@ -559,12 +561,15 @@ public class Router extends Device
 		{ System.out.println("-----init RIP-----");}
 		for (Iface entry : this.getInterfaces().values()) {
 			this.getRouteTable().insert(entry.getIpAddress() & entry.getSubnetMask(), 0, entry.getSubnetMask(), entry, 0, true);
-			if (DEBUG_RIP) 
-			{ System.out.println("-----add entry " + (entry.getIpAddress() & entry.getSubnetMask()) + " to router table-----");}
+		}
+		
+		for (Iface entry : this.getInterfaces().values()) {
 			// send RIP request 
 			sendPacket(generateRipPacket(new Ethernet(), entry, false, RIPv2.COMMAND_REQUEST), entry);
 		}
-
+		
+		if (DEBUG_RIP) 
+		{ System.out.print(this.routeTable.toString()); }
 		// send an unsolicited RIP response out all of the routers interfaces every 10 seconds thereafter.
 		this.sendTimer = new Timer();
 		this.sendTimer.scheduleAtFixedRate(new unsolicitedRIP(), 10000, 10000);
@@ -588,13 +593,14 @@ public class Router extends Device
 		udp.setDestinationPort(UDP.RIP_PORT);
 
 		RIPv2 rip = new RIPv2();
+		rip.setCommand(command);
 
 		ether.setPayload(ip);
 		ip.setPayload(udp);
 		udp.setPayload(rip);
 
 		if (isSpecific) {
-			ether.setDestinationMACAddress(packet.getSourceMACAddress().toString());
+			ether.setDestinationMACAddress(packet.getSourceMACAddress());
 			ip.setDestinationAddress(sourceIpv4.getSourceAddress());
 		} else {
 			ether.setDestinationMACAddress("FF:FF:FF:FF:FF:FF");
