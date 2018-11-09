@@ -255,7 +255,7 @@ public class Router extends Device
      		return;
      	}
      	// Set source MAC address in Ethernet header
-     	etherPacket.setSourceMACAddress(outIface.getMacAddress().toBytes());
+
      	
      	// If no gateway, then nextHop is IP destination
      	int nextHop = desiredRouteEntry.getGatewayAddress();
@@ -266,15 +266,16 @@ public class Router extends Device
         ArpEntry desiredArpEntry = this.arpCache.lookup(nextHop);
         if (null == desiredArpEntry)
         { 
-			//generateIcmpMessage(ipPacket, inIface, (byte)3, (byte)1);
             System.out.println("----------------------------------");
      		System.out.println("No ArpEntry matches for destination ip, start to send ARP requests!");
      		System.out.println("----------------------------------");
      		this.arpRequests(etherPacket, inIface, outIface, nextHop);
      		return; 
      	}
+     
+        // Set source & destination MAC address in Ethernet header
+     	etherPacket.setSourceMACAddress(outIface.getMacAddress().toBytes());
         etherPacket.setDestinationMACAddress(desiredArpEntry.getMac().toBytes());
-        //System.out.println("Send the packet out of interface: " + outIface);
         this.sendPacket(etherPacket, outIface);
  		
         /* old version
