@@ -306,10 +306,10 @@ public class RouteTable
 
 	public synchronized void cleanTable(){
 		long curTime = System.currentTimeMillis();
-		for (RouteEntry entry : this.getEntries()) {
-			if((entry != null) && (!entry.directReachable()) && ((curTime - entry.getTime()) > (30 * 1000))){
+		for (RouteEntry entry : this.entries) {
+			if(entry != null && !entry.directReachable() && (curTime - entry.getTime()) > (30 * 1000)){
 				System.out.println("Removing......");
-				this.getEntries().remove(entry);
+				this.entries.remove(entry);
 			}
 		}
 	}

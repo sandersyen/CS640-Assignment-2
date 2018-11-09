@@ -36,8 +36,8 @@ public class Router extends Device
 	/** ARP queue **/
 	private ConcurrentHashMap<Integer, List<Ethernet>> arpQueue;
 	
-	private final boolean DEBUG_ARP = true;  // ARP debug switch
-	private final boolean DEBUG_RIP = true;  // RIP debug switch
+	private final boolean DEBUG_ARP = false;  // ARP debug switch
+	private final boolean DEBUG_RIP = false;  // RIP debug switch
 
 	private Timer sendTimer;
 	private Timer cleanTimer;
@@ -176,6 +176,7 @@ public class Router extends Device
 			UDP udpPacket = (UDP)p.getPayload();
 			if (udpPacket.getDestinationPort() == UDP.RIP_PORT && udpPacket.getSourcePort() == UDP.RIP_PORT && p.getDestinationAddress() == IPv4.toIPv4Address("224.0.0.9")) {
 				handleRIPPacket(etherPacket, inIface);
+				return;
 			}
 		}
 
@@ -193,6 +194,7 @@ public class Router extends Device
 					UDP udpPacket = (UDP)p.getPayload();
 					if (udpPacket.getDestinationPort() == UDP.RIP_PORT && udpPacket.getSourcePort() == UDP.RIP_PORT){
 						handleRIPPacket(etherPacket, inIface);
+						return;
 					}
 				}
 				
@@ -542,8 +544,10 @@ public class Router extends Device
 		if (DEBUG_RIP) 
 		{ System.out.println("-----init RIP-----");}
 		for (Iface entry : this.getInterfaces().values()) {
-			this.getRouteTable().insert(entry.getIpAddress() & entry.getSubnetMask(), 0, entry.getSubnetMask(), entry, 0, true);
+			this.getRouteTable().insert(entry.getIpAddress() & entry.getSubnetMask(), 1, entry.getSubnetMask(), entry, 0, true);
+			routeTable.update_time(entry.getIpAddress() & entry.getSubnetMask(), entry.getSubnetMask());
 		}
+		
 		
 		for (Iface entry : this.getInterfaces().values()) {
 			// send RIP request 
@@ -554,7 +558,7 @@ public class Router extends Device
 		{ System.out.print(this.routeTable.toString()); }
 		// send an unsolicited RIP response out all of the routers interfaces every 10 seconds thereafter.
 		this.sendTimer = new Timer();
-		this.sendTimer.scheduleAtFixedRate(new unsolicitedRIP(), 10000, 10000);
+		this.sendTimer.scheduleAtFixedRate(new unsolicitedRIP(), 0, 10000);
 
 		// Your router should time out route table entries for which an update has not been received for more than 30 seconds. 
 		this.cleanTimer = new Timer();

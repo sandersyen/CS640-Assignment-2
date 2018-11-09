@@ -41,6 +41,7 @@ public class RouteEntry
 		this.gatewayAddress = gatewayAddress;
 		this.maskAddress = maskAddress;
 		this.iface = iface;
+		this.directReachable = false;
 	}
 	
 	/**
