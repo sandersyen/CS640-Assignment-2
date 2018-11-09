@@ -300,7 +300,7 @@ public class RouteTable
         }
 	}
 
-	public List<RouteEntry> getEntries() {
+	public synchronized List<RouteEntry> getEntries() {
 		return this.entries;
 	}
 
