@@ -306,11 +306,16 @@ public class RouteTable
 
 	public synchronized void cleanTable(){
 		long curTime = System.currentTimeMillis();
+		List<RouteEntry> temp = new LinkedList<RouteEntry>();
 		for (RouteEntry entry : this.entries) {
 			if(entry != null && !entry.directReachable() && (curTime - entry.getTime()) > (30 * 1000)){
 				System.out.println("Removing......");
-				this.entries.remove(entry);
+				//this.entries.remove(entry);
+				temp.add(entry);
 			}
+		}
+		for (RouteEntry entry : temp) {
+			this.remove(entry.getDestinationAddress(), entry.getMaskAddress());
 		}
 	}
 }
