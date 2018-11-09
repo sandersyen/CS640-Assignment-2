@@ -544,7 +544,7 @@ public class Router extends Device
 		if (DEBUG_RIP) 
 		{ System.out.println("-----init RIP-----");}
 		for (Iface entry : this.getInterfaces().values()) {
-			this.getRouteTable().insert(entry.getIpAddress() & entry.getSubnetMask(), 1, entry.getSubnetMask(), entry, 0, true);
+			this.getRouteTable().insert(entry.getIpAddress() & entry.getSubnetMask(), 0, entry.getSubnetMask(), entry, 0, true);
 			routeTable.update_time(entry.getIpAddress() & entry.getSubnetMask(), entry.getSubnetMask());
 		}
 		
